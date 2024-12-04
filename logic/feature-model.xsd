@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" attributeFormDefault="unqualified">
+    <!-- Define the root element -->
+    <xs:element name="featureModel">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="feature" type="FeatureType" maxOccurs="unbounded" />
+                <xs:element name="constraints" type="ConstraintsType" minOccurs="0" />
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Define the feature element and its attributes -->
+    <xs:complexType name="FeatureType">
+        <xs:sequence>
+            <xs:element name="feature" type="FeatureType" maxOccurs="unbounded" minOccurs="0" />
+            <xs:element name="group" type="GroupType" minOccurs="0" />
+        </xs:sequence>
+        <xs:attribute name="name" type="xs:string" use="required" />
+        <xs:attribute name="mandatory" type="xs:boolean" use="optional" />
+    </xs:complexType>
+
+    <!-- Define the group element and its attributes -->
+    <xs:complexType name="GroupType">
+        <xs:sequence>
+            <xs:element name="feature" type="FeatureType" maxOccurs="unbounded" />
+        </xs:sequence>
+        <xs:attribute name="type">
+            <xs:simpleType>
+                <xs:restriction base="xs:string">
+                    <xs:enumeration value="xor" />
+                    <xs:enumeration value="or" />
+                </xs:restriction>
+            </xs:simpleType>
+        </xs:attribute>
+    </xs:complexType>
+
+    <!-- Define the constraints element -->
+    <xs:complexType name="ConstraintsType">
+        <xs:sequence>
+            <xs:element name="constraint" type="ConstraintType" maxOccurs="unbounded" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Define individual constraint -->
+    <xs:complexType name="ConstraintType">
+        <xs:sequence>
+            <xs:element name="englishStatement" type="xs:string" minOccurs="0" />
+            <xs:element name="booleanExpression" type="xs:string" minOccurs="0" />
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>
