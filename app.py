@@ -1,7 +1,7 @@
 import os
 from werkzeug.utils import secure_filename
 from flask import Flask, request, render_template, jsonify
-from logic.parse import parse_feature_model, parse_features
+from logic.parse import parse_feature_model, parse_feature_model2
 from logic.validate import validate_configuration
 from logic.translate import translate_to_cnf
 from logic.xmlvalidate import validate_xml
@@ -43,7 +43,7 @@ def parse_xml():
 
         # Parse the uploaded XML file
         try:
-            logic_formulas, feature_ids = parse_feature_model(filepath)
+            logic_formulas= parse_feature_model(filepath)
 
 
             response = []
@@ -51,10 +51,7 @@ def parse_xml():
                 if formula.startswith("#"):
                     response.append({"constraint": formula})
                 else:
-                    id_to_feature = {v: k for k, v in feature_ids.items()}
                     formula_with_names = formula
-                    for feature_id, feature_name in id_to_feature.items():
-                        formula_with_names = formula_with_names.replace(str(feature_id), feature_name)
                     response.append({"logic_formula": formula_with_names})
                     
 
@@ -63,30 +60,48 @@ def parse_xml():
             return jsonify({"error": f"Error parsing XML: {str(e)}"}), 500
     else:
         return jsonify({"error": "Invalid file format. Only XML files are allowed."}), 400
-    
+
+
+
 @app.route('/validate', methods=['POST'])
 def validate_config():
     data = request.get_json()
     selected_features = data.get('selected_features', [])
     xml_file = data.get('xml_file')
 
-    valid = validate_xml(xml_file, xsd_schema)  # Ensure XML is valid
+    # Step 1: Validate the XML schema (using XSD schema)
+    valid = validate_xml(xml_file, xsd_schema)
     if not valid:
         return jsonify({"error": "Invalid XML file"}), 400
 
-    features, constraints = parse_features(xml_file)
-    cnf, feature_ids = translate_to_cnf(features, constraints)
+    # Step 2: Parse the feature model from XML using the new parse_feature_model2 function
+    features, validate_feature_selection, visualize_feature_model = parse_feature_model2(xml_file)
 
-    is_valid, model = validate_configuration(cnf, feature_ids, selected_features, features)
-    if is_valid:
-        id_to_feature = {v: k for k, v in feature_ids.items()}
-        configuration = {id_to_feature[abs(var)]: (var > 0) for var in model}
-        selected = [feature for feature, is_selected in configuration.items() if is_selected]
-        deselected = [feature for feature, is_selected in configuration.items() if not is_selected]
+    # Step 3: Visualize the feature model (send it to frontend for rendering)
+    feature_tree = visualize_feature_model(features)
 
-        return jsonify({"selected": selected, "deselected": deselected})
+    # Step 4: Validate the selected configuration dynamically
+    validation_result = {"valid": True, "errors": []}
 
-    return jsonify({"error": "Invalid configuration"}), 400
+    # Validate the selected features based on the constraints
+    for feature in selected_features:
+        # If a feature is selected, validate it
+        if feature in features:
+            validate_feature_selection(feature, True)
+        else:
+            validation_result["valid"] = False
+            validation_result["errors"].append(f"Feature {feature} not found in the model.")
+
+    if validation_result["valid"]:
+        # Return the feature tree and validation result to frontend
+        return jsonify({
+            "feature_tree": feature_tree,
+            "validation": validation_result,
+            "selected": selected_features,
+        })
+
+    return jsonify({"error": "Invalid configuration based on constraints", "details": validation_result}), 400
+
 
 if __name__ == '__main__':
     app.run(debug=True)
