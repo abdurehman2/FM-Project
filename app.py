@@ -79,7 +79,7 @@ def process_logic_and_mwp():
         logic_mapping = {f"constraint-{logic['constraintIndex']}": logic['logic'] for logic in logic_data}
         print("Propositional Logic Received:", logic_mapping)
 
-        
+
 
         # Locate the XML file
         xml_file = None

@@ -28,10 +28,10 @@ $(document).ready(function () {
 
           response.constraints.forEach((constraint, index) => {
             constraintsList.append(`
-                <p id="constraint-${index}">
-                  ${index + 1}. ${constraint.englishStatement}
-                </p>
-              `);
+                  <p id="constraint-${index}">
+                    ${index + 1}. ${constraint.englishStatement}
+                  </p>
+                `);
           });
 
           // Show the constraints section and hide upload section
@@ -61,19 +61,19 @@ $(document).ready(function () {
     $("#constraints-list p").each(function (index) {
       const constraintText = $(this).text();
       logicInputs.append(`
-          <div class="mb-3">
-            <label for="logic-${index}" class="form-label">
-              Logic for: ${constraintText}
-            </label>
-            <input
-              type="text"
-              class="form-control"
-              id="logic-${index}"
-              name="logic-${index}"
-              placeholder="Enter propositional logic (e.g., Location -> ByLocation)"
-            />
-          </div>
-        `);
+            <div class="mb-3">
+              <label for="logic-${index}" class="form-label">
+                Logic for: ${constraintText}
+              </label>
+              <input
+                type="text"
+                class="form-control"
+                id="logic-${index}"
+                name="logic-${index}"
+                placeholder="Enter propositional logic (e.g., Location -> ByLocation)"
+              />
+            </div>
+          `);
     });
   });
 
