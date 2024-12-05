@@ -39,4 +39,3 @@ for config in mwp_configurations:
 #             formula_with_names = formula_with_names.replace(str(feature_id), feature_name)
 #         print(formula_with_names)
 
-s

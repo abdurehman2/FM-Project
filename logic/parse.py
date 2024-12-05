@@ -107,26 +107,26 @@ def parse_feature_model(file_path):
                 for child in child_names:
                     formulas.append(f"{child} → {name}")
 
-    def parse_constraints(constraints):
-        for constraint in constraints.findall("constraint"):
-            english = constraint.find("englishStatement")
-            boolean_expression = constraint.find("booleanExpression")
+    # def parse_constraints(constraints):
+    #     for constraint in constraints.findall("constraint"):
+    #         english = constraint.find("englishStatement")
+    #         boolean_expression = constraint.find("booleanExpression")
 
-            if boolean_expression is not None and boolean_expression.text:
-                formulas.append(boolean_expression.text)
-            elif english is not None and english.text:
-                # Convert English constraints into Propositional Logic using the feature mapping
-                english_constraint = english.text.strip()
+    #         if boolean_expression is not None and boolean_expression.text:
+    #             formulas.append(boolean_expression.text)
+    #         elif english is not None and english.text:
+    #             # Convert English constraints into Propositional Logic using the feature mapping
+    #             english_constraint = english.text.strip()
                 
-                # Pre-process English statement by replacing feature names with variable names from the XML mapping
-                for english_feature, variable_name in feature_mapping.items():
-                    english_constraint = re.sub(rf'\b{re.escape(english_feature)}\b', variable_name.lower(), english_constraint)
+    #             # Pre-process English statement by replacing feature names with variable names from the XML mapping
+    #             for english_feature, variable_name in feature_mapping.items():
+    #                 english_constraint = re.sub(rf'\b{re.escape(english_feature)}\b', variable_name.lower(), english_constraint)
                 
-                propositional_constraint = convert_english_to_propositional(english_constraint, feature_mapping)
-                if propositional_constraint:
-                    formulas.append(propositional_constraint)
-                else:
-                    print(f"Skipping unsupported English constraint: {english_constraint}")
+    #             propositional_constraint = convert_english_to_propositional(english_constraint, feature_mapping)
+    #             if propositional_constraint:
+    #                 formulas.append(propositional_constraint)
+    #             else:
+    #                 print(f"Skipping unsupported English constraint: {english_constraint}")
 
     # Start parsing from the root
     root_feature = root.find("feature")
@@ -135,10 +135,10 @@ def parse_feature_model(file_path):
         formulas.append(f"{root_name} = True")  # Root feature is always true
         parse_feature(root_feature)
 
-    # Parse constraints
-    constraints = root.find("constraints")
-    if constraints is not None:
-        parse_constraints(constraints)
+    # # Parse constraints
+    # constraints = root.find("constraints")
+    # if constraints is not None:
+    #     parse_constraints(constraints)
 
     return formulas
 
@@ -192,6 +192,8 @@ def parse_feature_model1(file_path):
         parse_feature(root_feature)
 
     return features
+
+import itertools
 
 def find_minimum_working_product(features):
     """
@@ -252,6 +254,7 @@ def find_minimum_working_product(features):
             all_configurations.append(sorted(mwp_configuration))
 
     return all_configurations
+
 
 
 # feature_model_parser.py

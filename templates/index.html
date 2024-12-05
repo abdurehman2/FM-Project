@@ -8,193 +8,70 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
-    <link
-      href="{{ url_for('static', filename='style.css') }}"
-      rel="stylesheet"
-    />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
   </head>
   <body>
     <div class="container mt-5">
-      <h1 class="mb-4">Feature Model Interaction</h1>
+      <h1>Feature Model Interaction</h1>
 
-      <!-- XML File Upload Form -->
-      <form id="upload-form" enctype="multipart/form-data">
-        <div class="mb-3">
-          <label for="xml-file" class="form-label">Upload XML File</label>
-          <input type="file" class="form-control" id="xml-file" name="xml" />
-        </div>
-        <button type="submit" class="btn btn-primary">Upload XML</button>
-      </form>
+      <!-- Upload Section -->
+      <div id="upload-section">
+        <h3>Step 1: Upload XML File</h3>
+        <form id="upload-form" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label for="xml-file" class="form-label">Upload XML File</label>
+            <input type="file" class="form-control" id="xml-file" name="xml" />
+          </div>
+          <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+      </div>
 
-      <!-- Propositional Logic Output -->
-      <h3 class="mt-5">Propositional Logic Representation</h3>
-      <div id="propositional-logic" class="mb-3"></div>
-
-      <!-- Checkbox Tree -->
-      <h3 class="mt-5">Feature Model</h3>
-      <div id="checkbox-tree"></div>
-
-      <!-- Validation Section -->
-      <div class="mt-5">
-        <h3>Validate Configuration</h3>
-        <button class="btn btn-success" onclick="validateConfiguration()">
-          Validate
+      <!-- Cross-Tree Constraints Section -->
+      <div id="constraints-section" class="mt-5" style="display: none">
+        <h3>Step 2: Cross-Tree Constraints</h3>
+        <div id="constraints-list" class="mb-3"></div>
+        <button id="add-propositional-logic" class="btn btn-primary">
+          Add Propositional Logic
         </button>
-        <div id="validation-result" class="mt-3"></div>
+      </div>
+
+      <!-- Propositional Logic Input Section -->
+      <div id="propositional-section" class="mt-5" style="display: none">
+        <h3>Step 3: Add Propositional Logic</h3>
+        <form id="logic-form">
+          <div id="logic-inputs"></div>
+          <button type="submit" class="btn btn-success mt-3">
+            Submit Logic
+          </button>
+        </form>
+      </div>
+
+      <!-- MWP Results Section -->
+      <div id="mwp-section" class="mt-5" style="display: none">
+        <h3>Step 4: Review Results</h3>
+
+        <!-- Cross-Tree Constraints Display -->
+        <div class="mb-3">
+          <h4>Propositional Logic</h4>
+          <ul id="final-constraints-list"></ul>
+        </div>
+
+        <!-- Propositional Logic Display -->
+        <div class="mb-3">
+          <h4>Cross-Tree Constraints</h4>
+          <ul id="logic-list"></ul>
+        </div>
+
+        <!-- Minimum Working Product Configurations -->
+        <div class="mb-3">
+          <h4>Minimum Working Product Configurations</h4>
+          <ul id="mwp-list"></ul>
+        </div>
+
+        <button id="restart" class="btn btn-primary">Restart</button>
       </div>
     </div>
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-      let featureIds = {}; // Store feature ids for later validation
-
-      // Handle XML upload and parsing
-      $("#upload-form").on("submit", function (e) {
-        e.preventDefault();
-        const file = $("#xml-file")[0].files[0];
-        const formData = new FormData();
-        formData.append("xml", file);
-
-        // Send file to server for parsing
-        $.ajax({
-          url: "/parse",
-          type: "POST",
-          data: formData,
-          contentType: false,
-          processData: false,
-          success: function (response) {
-            console.log(response); // Log the response to ensure it's correctly formatted
-
-            // Display propositional logic
-            $("#propositional-logic").html("");
-            response.forEach((item) => {
-              if (item.constraint) {
-                $("#propositional-logic").append(
-                  "<p>" + item.constraint + "</p>"
-                );
-              } else {
-                $("#propositional-logic").append(
-                  "<p>" + item.logic_formula + "</p>"
-                );
-              }
-            });
-
-            // Generate checkbox tree dynamically based on the response
-            generateCheckboxTree(response);
-          },
-        });
-      });
-
-      // Generate the checkbox tree from the parsed XML response
-      function generateCheckboxTree(features) {
-        const treeContainer = $("#checkbox-tree");
-        treeContainer.html(""); // Clear previous content
-
-        // Set to keep track of the features we've already added
-        const addedFeatures = new Set();
-
-        features.forEach((item) => {
-          if (item.logic_formula) {
-            const formula = item.logic_formula;
-
-            // Extract features from the formula
-            const extractedFeatures = extractFeaturesFromFormula(formula);
-
-            extractedFeatures.forEach((feature) => {
-              if (!addedFeatures.has(feature)) {
-                addedFeatures.add(feature);
-
-                // Generate the checkbox HTML
-                const checkbox = `<div class="form-check">
-            <input type="checkbox" class="form-check-input" id="${feature}" onchange="updateSelectedFeatures()">
-            <label class="form-check-label" for="${feature}">${feature}</label>
-          </div>`;
-
-                // Append the checkbox to the tree container
-                treeContainer.append(checkbox);
-              }
-            });
-          }
-        });
-      }
-
-      // Extract unique feature names from the logic formula
-      function extractFeaturesFromFormula(formula) {
-        const regex = /[A-Za-z0-9_]+/g; // Matches words consisting of letters, numbers, and underscores
-        return formula.match(regex) || []; // Return matched features or an empty array
-      }
-
-      // Function to handle the selection of checkboxes (optional)
-      function updateSelectedFeatures() {
-        const selectedFeatures = [];
-        $(".form-check-input:checked").each(function () {
-          selectedFeatures.push(this.id);
-        });
-        console.log("Selected Features:", selectedFeatures);
-      }
-
-      // Function to validate the configuration
-      function validateConfiguration() {
-        const selectedFeatures = window.selectedFeatures || [];
-
-        if (selectedFeatures.length === 0) {
-          $("#validation-result").html(
-            '<div class="alert alert-danger">Please select at least one feature.</div>'
-          );
-          return;
-        }
-
-        // Get the uploaded XML file
-        const xmlFile = document.getElementById("xml-file").files[0];
-
-        if (!xmlFile) {
-          $("#validation-result").html(
-            '<div class="alert alert-danger">Please upload an XML file.</div>'
-          );
-          return;
-        }
-
-        // Create a FileReader to read the XML file content
-        const reader = new FileReader();
-
-        reader.onload = function (e) {
-          const xmlContent = e.target.result; // Get the XML file content
-
-          // Send AJAX request with the selected features and XML content
-          $.ajax({
-            url: "/validate",
-            type: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({
-              selected_features: selectedFeatures,
-              xml_file: xmlContent, // Send the XML content here
-            }),
-            success: function (response) {
-              $("#validation-result").html(
-                '<div class="alert alert-success">Valid Configuration!</div>'
-              );
-            },
-            error: function (xhr) {
-              $("#validation-result").html(
-                '<div class="alert alert-danger">' +
-                  xhr.responseJSON.error +
-                  "</div>"
-              );
-            },
-          });
-        };
-
-        reader.onerror = function () {
-          $("#validation-result").html(
-            '<div class="alert alert-danger">Error reading the XML file.</div>'
-          );
-        };
-
-        // Read the file content as text
-        reader.readAsText(xmlFile);
-      }
-    </script>
   </body>
 </html>

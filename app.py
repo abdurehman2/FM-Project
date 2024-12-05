@@ -1,107 +1,108 @@
 import os
+from lxml import etree
+import traceback
 from werkzeug.utils import secure_filename
 from flask import Flask, request, render_template, jsonify
-from logic.parse import parse_feature_model, parse_feature_model2
-from logic.validate import validate_configuration
-from logic.translate import translate_to_cnf
+from logic.parse import parse_feature_model1, find_minimum_working_product, parse_feature_model
 from logic.xmlvalidate import validate_xml
 
 app = Flask(__name__)
 
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'xml'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 xsd_schema = 'logic/feature-model.xsd'
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Configure the folder for saving uploaded files
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'xml'}
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 @app.route('/parse', methods=['POST'])
 def parse_xml():
-    # Check if a file was uploaded
     if 'xml' not in request.files:
         return jsonify({"error": "No file part"}), 400
     file = request.files['xml']
-
-    # If no file is selected
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
-
-    # Ensure the file has a valid extension
     if file and allowed_file(file.filename):
-        # Save the file temporarily
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         file.save(filepath)
-
-        # Parse the uploaded XML file
         try:
-            logic_formulas= parse_feature_model(filepath)
-
-
-            response = []
-            for formula in logic_formulas:
-                if formula.startswith("#"):
-                    response.append({"constraint": formula})
-                else:
-                    formula_with_names = formula
-                    response.append({"logic_formula": formula_with_names})
-                    
-
-            return jsonify(response)
+            if xsd_schema:
+                with open(xsd_schema, 'rb') as xsd_file:
+                    schema_doc = etree.parse(xsd_file)
+                    schema = etree.XMLSchema(schema_doc)
+                xml_doc = etree.parse(filepath)
+                schema.assertValid(xml_doc)
+            tree = etree.parse(filepath)
+            root = tree.getroot()
+            features = root.xpath('//feature/@name')
+            constraints = [
+                {"englishStatement": constraint.findtext('englishStatement')}
+                for constraint in root.xpath('//constraints/constraint')
+                if constraint.findtext('englishStatement')
+            ]
+            if not constraints:
+                return jsonify({"error": "No cross-tree constraints found in the XML."}), 400
+            return jsonify({"features": features, "constraints": constraints})
         except Exception as e:
-            return jsonify({"error": f"Error parsing XML: {str(e)}"}), 500
-    else:
-        return jsonify({"error": "Invalid file format. Only XML files are allowed."}), 400
+            return jsonify({"error": f"Error parsing file: {str(e)}"}), 500
+    return jsonify({"error": "Invalid file type. Only XML files are allowed."}), 400
+
+@app.route('/process_logic_and_mwp', methods=['POST'])
+def process_logic_and_mwp():
+    try:
+        data = request.json
+        logic_data = data.get("logicData", [])
+
+        # Validate logic data format
+        for logic in logic_data:
+            if not isinstance(logic, dict) or 'constraintIndex' not in logic or 'logic' not in logic:
+                return jsonify({"error": "Invalid logic format"}), 400
+
+        logic_mapping = {f"constraint-{logic['constraintIndex']}": logic['logic'] for logic in logic_data}
+        print("Propositional Logic Received:", logic_mapping)
+
+        # Ensure XML file exists
+        xml_file = 'uploads/feature-model.xml'
+        if not os.path.exists(xml_file):
+            return jsonify({"error": "XML file not found"}), 400
+
+        # Validate XML file
+        valid = validate_xml(xml_file, xsd_schema)
+        if not valid:
+            return jsonify({"error": "Invalid XML file"}), 400
+
+        # Parse the feature model and generate logic
+        propositional_logic = parse_feature_model(xml_file)
+
+        # Parse features for MWP calculation
+        features = parse_feature_model1(xml_file)
+
+        # Calculate MWP configurations
+        mwp_configurations = find_minimum_working_product(features)
+        print("MWP Configurations:", mwp_configurations)
+
+        # Format the MWP configurations for output
+        mwp_list = [", ".join(config) for config in mwp_configurations]
+
+        # Return MWP, the entered logic, and propositional logic
+        response = {
+            "logicMapping": logic_mapping,
+            "mwpConfigurations": mwp_list,
+            "propositionalLogic": propositional_logic,  # Add this to the response
+        }
+        return jsonify(response)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Error processing logic and MWP: {str(e)}"}), 500
 
 
-
-@app.route('/validate', methods=['POST'])
-def validate_config():
-    data = request.get_json()
-    selected_features = data.get('selected_features', [])
-    xml_file = data.get('xml_file')
-
-    # Step 1: Validate the XML schema (using XSD schema)
-    valid = validate_xml(xml_file, xsd_schema)
-    if not valid:
-        return jsonify({"error": "Invalid XML file"}), 400
-
-    # Step 2: Parse the feature model from XML using the new parse_feature_model2 function
-    features, validate_feature_selection, visualize_feature_model = parse_feature_model2(xml_file)
-
-    # Step 3: Visualize the feature model (send it to frontend for rendering)
-    feature_tree = visualize_feature_model(features)
-
-    # Step 4: Validate the selected configuration dynamically
-    validation_result = {"valid": True, "errors": []}
-
-    # Validate the selected features based on the constraints
-    for feature in selected_features:
-        # If a feature is selected, validate it
-        if feature in features:
-            validate_feature_selection(feature, True)
-        else:
-            validation_result["valid"] = False
-            validation_result["errors"].append(f"Feature {feature} not found in the model.")
-
-    if validation_result["valid"]:
-        # Return the feature tree and validation result to frontend
-        return jsonify({
-            "feature_tree": feature_tree,
-            "validation": validation_result,
-            "selected": selected_features,
-        })
-
-    return jsonify({"error": "Invalid configuration based on constraints", "details": validation_result}), 400
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
