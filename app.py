@@ -1,8 +1,10 @@
 import os
+import uuid
 from lxml import etree
 import traceback
 from werkzeug.utils import secure_filename
 from flask import Flask, request, render_template, jsonify
+
 from logic.parse import parse_feature_model1, find_minimum_working_product, parse_feature_model
 from logic.xmlvalidate import validate_xml
 
@@ -13,12 +15,15 @@ ALLOWED_EXTENSIONS = {'xml'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 xsd_schema = 'logic/feature-model.xsd'
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/parse', methods=['POST'])
 def parse_xml():
@@ -29,10 +34,12 @@ def parse_xml():
         return jsonify({"error": "No selected file"}), 400
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        unique_id = str(uuid.uuid4())
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"{unique_id}_{filename}")
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         file.save(filepath)
         try:
+            # Validate XML against XSD schema
             if xsd_schema:
                 with open(xsd_schema, 'rb') as xsd_file:
                     schema_doc = etree.parse(xsd_file)
@@ -49,18 +56,22 @@ def parse_xml():
             ]
             if not constraints:
                 return jsonify({"error": "No cross-tree constraints found in the XML."}), 400
-            return jsonify({"features": features, "constraints": constraints})
+            return jsonify({"features": features, "constraints": constraints, "fileId": unique_id})
         except Exception as e:
+            traceback.print_exc()
             return jsonify({"error": f"Error parsing file: {str(e)}"}), 500
     return jsonify({"error": "Invalid file type. Only XML files are allowed."}), 400
+
 
 @app.route('/process_logic_and_mwp', methods=['POST'])
 def process_logic_and_mwp():
     try:
         data = request.json
-        logic_data = data.get("logicData", [])
+        file_id = data.get("fileId")
+        if not file_id:
+            return jsonify({"error": "Missing file ID."}), 400
 
-        # Validate logic data format
+        logic_data = data.get("logicData", [])
         for logic in logic_data:
             if not isinstance(logic, dict) or 'constraintIndex' not in logic or 'logic' not in logic:
                 return jsonify({"error": "Invalid logic format"}), 400
@@ -68,15 +79,20 @@ def process_logic_and_mwp():
         logic_mapping = {f"constraint-{logic['constraintIndex']}": logic['logic'] for logic in logic_data}
         print("Propositional Logic Received:", logic_mapping)
 
-        # Ensure XML file exists
-        xml_file = 'uploads/feature-model.xml'
-        if not os.path.exists(xml_file):
-            return jsonify({"error": "XML file not found"}), 400
+        # Locate the XML file
+        xml_file = None
+        for file in os.listdir(app.config['UPLOAD_FOLDER']):
+            if file.startswith(file_id):
+                xml_file = os.path.join(app.config['UPLOAD_FOLDER'], file)
+                break
+
+        if not xml_file or not os.path.exists(xml_file):
+            return jsonify({"error": "XML file not found."}), 400
 
         # Validate XML file
         valid = validate_xml(xml_file, xsd_schema)
         if not valid:
-            return jsonify({"error": "Invalid XML file"}), 400
+            return jsonify({"error": "Invalid XML file."}), 400
 
         # Parse the feature model and generate logic
         propositional_logic = parse_feature_model(xml_file)
@@ -95,7 +111,7 @@ def process_logic_and_mwp():
         response = {
             "logicMapping": logic_mapping,
             "mwpConfigurations": mwp_list,
-            "propositionalLogic": propositional_logic,  # Add this to the response
+            "propositionalLogic": propositional_logic,
         }
         return jsonify(response)
 

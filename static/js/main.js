@@ -1,4 +1,6 @@
 $(document).ready(function () {
+  let fileId = null; // To track the uploaded file's ID
+
   // Handle file upload
   $("#upload-form").on("submit", function (e) {
     e.preventDefault();
@@ -19,6 +21,7 @@ $(document).ready(function () {
       contentType: false,
       processData: false,
       success: function (response) {
+        fileId = response.fileId; // Save fileId from the response
         if (response.constraints && response.constraints.length > 0) {
           const constraintsList = $("#constraints-list");
           constraintsList.empty(); // Clear previous constraints
@@ -78,6 +81,11 @@ $(document).ready(function () {
   $("#logic-form").on("submit", function (e) {
     e.preventDefault();
 
+    if (!fileId) {
+      alert("No file uploaded. Please restart the process.");
+      return;
+    }
+
     const logicData = [];
     let isValid = true;
 
@@ -105,7 +113,7 @@ $(document).ready(function () {
       url: "/process_logic_and_mwp",
       type: "POST",
       contentType: "application/json",
-      data: JSON.stringify({ logicData }),
+      data: JSON.stringify({ fileId, logicData }),
       success: function (response) {
         console.log("Response received:", response);
 
@@ -149,5 +157,6 @@ $(document).ready(function () {
     $("#mwp-section").hide();
     $("#upload-section").show();
     $("#xml-file").val(""); // Reset the file input
+    fileId = null; // Reset fileId
   });
 });
