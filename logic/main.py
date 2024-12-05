@@ -4,9 +4,6 @@ from translate import translate_to_cnf
 from xmlvalidate import validate_xml
 from calculate import calculate_mwp
 
-
-
-
 xml_file = 'feature-model.xml'
 
 valid = validate_xml(xml_file, 'feature-model.xsd')
@@ -26,16 +23,4 @@ mwp_configurations = find_minimum_working_product(features)
 print("Minimum Working Product (MWP) configurations satisfying crosstree constraints:")
 for config in mwp_configurations:
     print(", ".join(config))
-# # Display propositional logic as feature names
-# print("Propositional Logic Representation:")
-# for formula in logic_formulas:
-#     if formula.startswith("#"):  # Print constraints as comments
-#         print(formula)
-#     else:
-#         # Replace IDs with feature names
-#         id_to_feature = {v: k for k, v in feature_ids.items()}
-#         formula_with_names = formula
-#         for feature_id, feature_name in id_to_feature.items():
-#             formula_with_names = formula_with_names.replace(str(feature_id), feature_name)
-#         print(formula_with_names)
 
